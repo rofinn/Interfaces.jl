@@ -34,14 +34,19 @@ macro interface(name, prototypes)
             obj
 
             function $(typename)(other)
-                methods_exist($(typename), typeof(other))
+                methods_exist($(typename), typeof(other), current_module())
                 new(other)
             end
         end
     end
 
     for line in prototypes.args
-        if isa(line, Expr)
+        if isa(line, Symbol)
+            println("Providing only function names isn't supported yet.")
+            continue
+        elseif line.head == :line
+            continue
+        elseif isa(line, Expr)
             func = esc(line)
             fname = esc(line.args[1])
             linebody = copy(line)
@@ -62,17 +67,12 @@ macro interface(name, prototypes)
                 $code
                 $(func) = $(funcbody)
             end
-        elseif isa(line, Symbol)
-            println("Providing only function names isn't supported yet.")
-            continue
-        elseif line.head == :line
-            continue
         else
             error("Invalid type for line")
         end
     end
 
-    println(code)
+    #println(code)
 
     return code
 end
@@ -81,7 +81,7 @@ end
     Determines whether type obj supports all the same methods
     as type self.
 """ ->
-function methods_exist(self, obj)
+function methods_exist(self, obj, mod)
     method_found = false
     for self_method in methodswith(self)
         method_found = false
@@ -91,7 +91,9 @@ function methods_exist(self, obj)
             obj_fname = obj_method.func.code.name
             if obj_fname == self_fname
                 params = map(x -> x == self ? obj : x, self_method.sig)
-                if method_exists(eval(obj_fname), params)
+                func = eval(mod, obj_fname)
+                # println("$(func)($(params))")
+                if method_exists(func, params)
                     method_found = true
                     break
                 end
