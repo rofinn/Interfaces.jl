@@ -90,7 +90,12 @@ function methods_exist(self, obj, mod)
         for obj_method in methodswith(obj)
             obj_fname = obj_method.func.code.name
             if obj_fname == self_fname
-                params = map(x -> x == self ? obj : x, self_method.sig)
+                params = ()
+                if VERSION < v"0.4-"
+                    params = map(x -> x == self ? obj : x, self_method.sig)
+                else
+                    params = tuple(map(x -> x == self ? obj : x, self_method.sig.parameters)...)
+                end
                 func = eval(mod, obj_fname)
                 # println("$(func)($(params))")
                 if method_exists(func, params)
@@ -100,7 +105,7 @@ function methods_exist(self, obj, mod)
            end
         end
         if !method_found
-            error("Required method $(self_fname)($(self_method.sig)) not implemented for $(typeof(obj))")
+            error("Required method $(self_fname)($(self_method.sig)) not implemented for $(obj)")
         end
     end
 end
