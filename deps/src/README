@@ -3,7 +3,7 @@ Super simple instructions for how to use this shared library in Julia:
 ```
 # Julia path from a Homebrew installation
 JULIA_DIR=/usr/local/Cellar/julia/HEAD
-gcc -c -Wall -Werror -fPIC -I$JULIA_DIR/include/julia mutable_union.c
+gcc -c -Wall -Werror -fPIC -I$JULIA_DIR/include/julia mutable_union.c -o usr/lib/mutable_union
 gcc -shared -ljulia -L$JULIA_DIR/lib/julia -o lib_mutable_union.so mutable_union.o
 
 julia
