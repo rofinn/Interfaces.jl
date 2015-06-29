@@ -1,0 +1,23 @@
+Super simple instructions for how to use this shared library in Julia:
+
+```
+# Julia path from a Homebrew installation
+JULIA_DIR=/usr/local/Cellar/julia/HEAD
+gcc -c -Wall -Werror -fPIC -I$JULIA_DIR/include/julia mutable_union.c
+gcc -shared -ljulia -L$JULIA_DIR/lib/julia -o lib_mutable_union.so mutable_union.o
+
+julia
+
+# Basic usage
+u = ccall((:jl_type_multable_union, "lib_mutable_union.so"), Any, ())
+ccall((:jl_type_mutable_union_append, "lib_mutable_union.so"), Void, (Any, Any), u, Int64)
+ccall((:jl_type_mutable_union_append, "lib_mutable_union.so"), Void, (Any, Any), u, Float64)
+
+# Testing: The empty Union from Julia cannot be appended too.
+u = Union{}
+ccall((:jl_type_mutable_union_append, "lib_mutable_union.so"), Void, (Any, Any), u, Int64)
+
+# Testing: Single type in a Union resulting in a non-union.
+u = Union{Float64}
+ccall((:jl_type_mutable_union_append, "lib_mutable_union.so"), Void, (Any, Any), u, Int64)
+```
