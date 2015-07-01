@@ -30,14 +30,7 @@ macro interface(name, prototypes)
 
     typename = esc(name)
     code = quote
-        type $(typename)
-            obj
-
-            function $(typename)(other)
-                methods_exist($(typename), typeof(other), current_module())
-                new(other)
-            end
-        end
+        typealias $(typename) ccall(Libdl.dlsym(MUTABLE_UNION_LIB, :jl_type_mutable_union), Any, ())
     end
 
     for line in prototypes.args
@@ -49,33 +42,42 @@ macro interface(name, prototypes)
         elseif isa(line, Expr)
             func = esc(line)
             fname = esc(line.args[1])
-            linebody = copy(line)
 
-            for i in 2:length(linebody.args)
-                if isa(linebody.args[i], Expr)
-                    if linebody.args[i].args[2] == name
-                        linebody.args[i] = parse(
-                            string(linebody.args[i].args[1], ".obj")
-                        )
-                    else
-                        linebody.args[i] = linebody.args[i].args[1]
-                    end
-                end
-            end
-            funcbody = esc(linebody)
             code = quote
                 $code
-                $(func) = $(funcbody)
+                $(func) = error("$(fname) not implemented")
             end
         else
             error("Invalid type for line")
         end
     end
 
-    #println(code)
-
     return code
 end
+
+
+@doc doc"""
+    At the lowest level we add a single Type to the interface typealias union.
+""" ->
+function implements(name::Type, interfaces::Union{Type,Tuple})
+    interface_names = None
+    if isa(interfaces, Type)
+        interface_names = (interfaces,)
+    elseif isa(interfaces, Tuple)
+        interface_names = interfaces
+    end
+
+    for i in interface_names
+        println(i)
+        println(typeof(i))
+        methods_exist(name, i, current_module())
+
+        ccall(Libdl.dlsym(MUTABLE_UNION_LIB, :jl_type_mutable_union_append),
+            Void, (Any, Any), i, name
+        )
+    end
+end
+
 
 @doc doc"""
     Determines whether type obj supports all the same methods
@@ -106,6 +108,21 @@ function methods_exist(self, obj, mod)
         end
         if !method_found
             error("Required method $(self_fname)($(self_method.sig)) not implemented for $(obj)")
+        end
+    end
+end
+
+macro dlsym(func, lib)
+    z, zlocal = gensym(string(func)), gensym()
+    eval(current_module(),:(global $z = C_NULL))
+    z = esc(z)
+    quote
+        let $zlocal::Ptr{Void} = $z::Ptr{Void}
+            if $zlocal == C_NULL
+               $zlocal = dlsym($(esc(lib))::Ptr{Void}, $(esc(func)))
+               global $z = $zlocal
+            end
+            $zlocal
         end
     end
 end
