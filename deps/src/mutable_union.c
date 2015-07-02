@@ -22,9 +22,12 @@ jl_uniontype_t *force_union_type(jl_svec_t *types)
 
         // Override the types internal to the union.
         if(!jl_is_uniontype(u))
-            uf->types = jl_svec_fill(1, u);
+            types = jl_svec_fill(1, u);
         else
-            uf->types = jl_alloc_svec_uninit(0);
+            types = jl_alloc_svec_uninit(0);
+
+        uf->types = types;
+        jl_gc_wb(uf, types);
 
         u = (jl_value_t*) uf;
     }
@@ -46,7 +49,9 @@ void jl_type_mutable_union_append(jl_value_t *u, jl_value_t *t)
         jl_svec_t *new_types = jl_svec_append(_union->types, jl_svec_fill(1, t));
 
         jl_uniontype_t *new_union = force_union_type(new_types);
+        new_types = new_union->types;  // Get pointer to flattened types.
 
-        _union->types = new_union->types;
+        _union->types = new_types;
+        jl_gc_wb(_union, new_types);
     }
 }
