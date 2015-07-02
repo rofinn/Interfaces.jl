@@ -9,7 +9,7 @@ gcc -shared -ljulia -L$JULIA_DIR/lib/julia -o lib_mutable_union.so mutable_union
 julia
 
 # Basic usage
-u = ccall((:jl_type_multable_union, "lib_mutable_union.so"), Any, ())
+u = ccall((:jl_type_mutable_union, "lib_mutable_union.so"), Any, ())
 ccall((:jl_type_mutable_union_append, "lib_mutable_union.so"), Void, (Any, Any), u, Int64)
 ccall((:jl_type_mutable_union_append, "lib_mutable_union.so"), Void, (Any, Any), u, Float64)
 

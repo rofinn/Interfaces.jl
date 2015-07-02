@@ -7,7 +7,7 @@ FILE_PATH = @__FILE__
 PKG_PATH = dirname(FILE_PATH)
 MUTABLE_UNION_LIB = Libdl.dlopen("$PKG_PATH/../deps/usr/lib/lib_mutable_union.so")
 
-export @interface, implements, methods_exist, MUTABLE_UNION_LIB
+export @interface, @implements, implements, methods_exist, MUTABLE_UNION_LIB
 
 include("core.jl")
 

@@ -9,20 +9,6 @@
             func2(self::MyInterfaceType, y)
         end
         ```
-
-        which generates a wrapper
-        ```
-        type MyInterfaceType
-            obj
-
-            function MyInterface(other)
-                methods_exist(MyInterface, typeof(other))
-                new(other)
-            end
-        end
-        func1(self::MyInterfaceType, x::Int) = func1(self.obj, x)
-        func2(self::MyInterfaceType, y) = func2(self.obj, y)
-        ```
 """ ->
 macro interface(name, prototypes)
     @assert isa(name, Symbol)
@@ -57,7 +43,54 @@ end
 
 
 @doc doc"""
-    At the lowest level we add a single Type to the interface typealias union.
+    A second macro for making a type implement a declared interface. This is really
+    just syntactic sugar for the implements function. The macro takes an
+    expression of the forms provided below and calls the implements function
+
+    Usage:
+        *Assuming MyType and MyInterface exist and MyType has
+        all the required methods defined
+        ```
+        @implements MyType <: MyInterface
+        ```
+
+    or to implement multiple interfaces at once
+        ```
+        @implements MyType <: (MyInterface, OtherInterface, ...)
+        ```
+""" ->
+macro implements(expr)
+   @assert isa(expr, Expr)
+   @assert length(expr.args) == 3
+   @assert expr.args[2] == :<:
+
+   typename = esc(expr.args[1])
+   interfaces = esc(expr.args[3])
+   code = quote
+       Interfaces.implements($(typename), $(interfaces))
+   end
+   return code
+end
+
+
+@doc doc"""
+    The implements function called from the @implements macro
+    takes a single type and either a single Interface or a Tuple of Interfaces.
+    The implements function uses methods with to ensure that Type provided implements
+    each of the required methods for each Interfaces and then updates the typealias
+    union for that Interface with the Type.
+
+    Usage:
+        *Assuming MyType and MyInterface exist and MyType has
+        all the required methods defined
+        ```
+        implements(MyType, MyInterface)
+        ```
+
+        or for a batch implements
+        ```
+        implements(MyType, (MyInterface, MyOtherInterface))
+        ```
 """ ->
 function implements(name::Type, interfaces::Union{Type,Tuple})
     interface_names = None
@@ -68,13 +101,16 @@ function implements(name::Type, interfaces::Union{Type,Tuple})
     end
 
     for i in interface_names
-        println(i)
-        println(typeof(i))
-        methods_exist(name, i, current_module())
+        # Only bother checking the methods and updating the typealias
+        # If the interface != type, since methodswith is slow
+        # (Note: Foo == Union{Foo})
+        if i != name
+            methods_exist(i, name, current_module())
 
-        ccall(Libdl.dlsym(MUTABLE_UNION_LIB, :jl_type_mutable_union_append),
-            Void, (Any, Any), i, name
-        )
+            ccall(Libdl.dlsym(MUTABLE_UNION_LIB, :jl_type_mutable_union_append),
+                Void, (Any, Any), i, name
+            )
+        end
     end
 end
 
@@ -99,7 +135,6 @@ function methods_exist(self, obj, mod)
                     params = tuple(map(x -> x == self ? obj : x, self_method.sig.parameters)...)
                 end
                 func = eval(mod, obj_fname)
-                # println("$(func)($(params))")
                 if method_exists(func, params)
                     method_found = true
                     break
@@ -108,21 +143,6 @@ function methods_exist(self, obj, mod)
         end
         if !method_found
             error("Required method $(self_fname)($(self_method.sig)) not implemented for $(obj)")
-        end
-    end
-end
-
-macro dlsym(func, lib)
-    z, zlocal = gensym(string(func)), gensym()
-    eval(current_module(),:(global $z = C_NULL))
-    z = esc(z)
-    quote
-        let $zlocal::Ptr{Void} = $z::Ptr{Void}
-            if $zlocal == C_NULL
-               $zlocal = dlsym($(esc(lib))::Ptr{Void}, $(esc(func)))
-               global $z = $zlocal
-            end
-            $zlocal
         end
     end
 end
