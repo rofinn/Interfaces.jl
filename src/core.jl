@@ -1,3 +1,8 @@
+type MethodSig
+    name::Symbol
+    params::Array{Any, 1}
+end
+
 @doc doc"""
     A simple macro to automate creating interface code.
 
@@ -15,10 +20,18 @@ macro interface(name, prototypes)
     @assert prototypes.head == :block
 
     typename = esc(name)
+    # hidden_typename is just used as a hack to make sure updateing
+    # the mutable unions modifies what is excepted by functions that use it
+    hidden_typename = esc("_$(name)")
     code = quote
         typealias $(typename) ccall(Libdl.dlsym(MUTABLE_UNION_LIB, :jl_type_mutable_union), Any, ())
+        eval(parse(string("type ", $(hidden_typename), " end")))
+        ccall(Libdl.dlsym(MUTABLE_UNION_LIB, :jl_type_mutable_union_append),
+                Void, (Any, Any), $(typename), $(hidden_typename)
+            )
     end
 
+    methods = []
     for line in prototypes.args
         if isa(line, Symbol)
             println("Providing only function names isn't supported yet.")
@@ -26,16 +39,20 @@ macro interface(name, prototypes)
         elseif line.head == :line
             continue
         elseif isa(line, Expr)
-            func = esc(line)
-            fname = esc(line.args[1])
-
-            code = quote
-                $code
-                $(func) = error("$(fname) not implemented")
+            fname = line.args[1]
+            params = []
+            for arg in line.args[2:end]
+                push!(params, arg.args[2])
             end
-        else
-            error("Invalid type for line")
+            push!(methods, MethodSig(fname, params))
         end
+    end
+
+    func = esc(:(get_methods(interface::Type{$(name)}) = return $(methods)))
+
+    code = quote
+        $code
+        $func
     end
 
     return code
@@ -116,33 +133,32 @@ end
 
 
 @doc doc"""
-    Determines whether type obj supports all the same methods
-    as type self.
+    Determines whether type atype supports all the same methods
+    as the interface.
 """ ->
-function methods_exist(self, obj, mod)
-    method_found = false
-    for self_method in methodswith(self)
-        method_found = false
-        self_fname = self_method.func.code.name    # Dumb! and it doesn't even tab complete
+function methods_exist(interface::Type, atype::Type, mod)
+    get_methods_func = eval(mod, :get_methods)
+    interface_type = eval(mod, interface)
+    for interface_method in get_methods_func(interface_type)
+        fname = interface_method.name
+        params = []
 
-        for obj_method in methodswith(obj)
-            obj_fname = obj_method.func.code.name
-            if obj_fname == self_fname
-                params = ()
-                if VERSION < v"0.4-"
-                    params = map(x -> x == self ? obj : x, self_method.sig)
-                else
-                    params = tuple(map(x -> x == self ? obj : x, self_method.sig.parameters)...)
-                end
-                func = eval(mod, obj_fname)
-                if method_exists(func, params)
-                    method_found = true
-                    break
-                end
-           end
+        for p in interface_method.params
+            param = eval(mod, p)
+            if param == interface
+                push!(params, atype)
+            else
+                push!(params, param)
+            end
         end
-        if !method_found
-            error("Required method $(self_fname)($(self_method.sig)) not implemented for $(obj)")
+
+        func = eval(mod, fname)
+        if !method_exists(func, tuple(params...))
+            error("Required method $(fname)($(params)) not implemented for $(atype)")
         end
     end
+end
+
+function _create_get_methods(expr::Expr)
+    eval(expr)
 end
