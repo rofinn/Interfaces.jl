@@ -159,6 +159,3 @@ function methods_exist(interface::Type, atype::Type, mod)
     end
 end
 
-function _create_get_methods(expr::Expr)
-    eval(expr)
-end
