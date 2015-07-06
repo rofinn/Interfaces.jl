@@ -5,13 +5,14 @@ notifications:
   email: false
 env:
   matrix:
-    - JULIAVERSION="juliareleases"
+    #- JULIAVERSION="juliareleases"
     - JULIAVERSION="julianightlies"
 before_install:
   - sudo add-apt-repository ppa:staticfloat/julia-deps -y
   - sudo add-apt-repository ppa:staticfloat/${JULIAVERSION} -y
   - sudo apt-get update -qq -y
   - sudo apt-get install libpcre3-dev julia -y
+  - sudo ln -s /usr/lib/x86_64-linux-gnu/julia /usr/lib/julia
 script:
   - julia --check-bounds=yes -e 'Pkg.init(); Pkg.clone(pwd()); Pkg.build("Interfaces"); Pkg.test("Interfaces"; coverage=true)'
 after_success:
