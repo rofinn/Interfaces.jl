@@ -23,6 +23,7 @@ macro interface(name, prototypes)
     # hidden_typename is just used as a hack to make sure updateing
     # the mutable unions modifies what is excepted by functions that use it
     hidden_typename = esc("_$(name)")
+    strname = string(name)
     code = quote
         typealias $(typename) ccall(Libdl.dlsym(MUTABLE_UNION_LIB, :jl_type_mutable_union), Any, ())
         eval(parse(string("type ", $(hidden_typename), " end")))
@@ -53,6 +54,7 @@ macro interface(name, prototypes)
     code = quote
         $code
         $func
+        Base.show(io::IO, obj::Type{$(typename)}) = print(io, $(strname))
     end
 
     return code
