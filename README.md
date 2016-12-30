@@ -1,5 +1,7 @@
-# Interfaces.jl
+# Interfaces.jl (not maintained)
 [![Build Status](https://travis-ci.org/Rory-Finnegan/Interfaces.jl.svg?branch=master)](https://travis-ci.org/Rory-Finnegan/Interfaces.jl)  [![Coverage Status](https://coveralls.io/repos/Rory-Finnegan/Interfaces.jl/badge.svg?branch=master)](https://coveralls.io/r/Rory-Finnegan/Interfaces.jl?branch=master)
+
+NOTE: This package was initially designed as a proof of concept for interfaces in julia. However, with changes to how unions work in base julia the approach taken here no longer works.
 
 ## Summary
 Interfaces.jl takes a simplistic approach to defining and using interfaces in julia. Rather than creating an interface which you need to subtype for all types that satisfy the required methods, you can simply state that a type implements some interfaces without needing to modify your existing type heirarchy.
